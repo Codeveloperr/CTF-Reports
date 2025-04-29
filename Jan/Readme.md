@@ -60,10 +60,14 @@ Attempt privilege escalation from that account (if vulnerable code is found).
 Launch social engineering attacks against internal users.
 
 6. Recommendations / Remediation
-Implement account lockout or penalties after a limited number of failed attempts (e.g., after 5 tries).
+Harden the /redirect endpoint
 
-Add delays (rate-limiting) between login attempts.
+Strict single‐param parsing: Only accept one url parameter. Reject requests containing multiple url parameters.
 
-Monitor and alert for brute-force patterns.
+Allow-list valid targets: Only permit internal paths or explicitly approved domains.
 
-(Optional) Implement multi-factor authentication (MFA) for administrative access.
+Normalize & sanitize inputs: Remove or percent-encode any leading /, // or protocol schemes before processing.
+
+Reject unknown schemes: Disallow redirects to relative paths unless they exactly match internal routes.
+
+Detailed logging & monitoring: Record all redirect requests and trigger alerts on any attempt to redirect outside the allow-list.
