@@ -37,10 +37,13 @@ Open ports: 22/tcp (SSH), 8080/tcp (HTTP)
 gobuster dir -u http://192.168.1.130:8080 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt --exclude-length 45
 Discovered directory: /admin
 
-4.3. Credential Brute-Forcing
+4.3. Credentials
 
-hydra -l jan -P /usr/share/wordlists/rockyou.txt 192.168.1.130 http-post-form "/admin/index.php:username=^USER^&password=^PASS^:F=Invalid" -s 8080
-Discovered credentials: jan:jan123
+The directory was sending a message "Only accessible internally." checking some directorys i found the message "Parameter 'url' needed."
+Doing checks i discovered that if you send 2 requests to the domain on the same line the server did not check the 2nd request. 
+After going into /credz i found "ssh/EazyLOL"
+
+After conecting via ssh with the password EazyLOL, i found the user.txt with the flag
 
 4.4. Account Access
 Successful authentication using the retrieved credentials.
