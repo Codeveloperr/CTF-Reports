@@ -25,8 +25,8 @@ hydra
 3. Finding Description
 Clear explanation of what was achieved and its significance:
 
-Through a brute-force attack on the login form located at http://192.168.1.130:8080/admin, valid credentials (jan:jan123) were obtained, allowing authentication as user jan.
-This demonstrates that the panel does not limit or delay failed login attempts, making it vulnerable to brute-force attacks against real users.
+Through a brute-force attack on the login form located at http://192.168.1.130:8080/admin, valid credentials were obtained, allowing authentication as user.
+This demonstrates that the panel does not limit or delay failed login attempts.
 
 4. Proof of Concept (PoC)
 4.1. Port Scanning
